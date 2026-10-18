@@ -19,7 +19,7 @@ int main(int ac, char **av) {
 			switch (av[i][1]) {
 				case 'h': printf("Usage:\n\t%s if=[FILE] of=[FILE]\n\t\t-h # prints this menu\n\t\t-v # prints version\n\t\t-g # prints guide\n", av[0]); return 0;
 				case 'v': printf("Version v1.0\n"); return 0;
-				case 'g': printf("Guide:\t[] :: loops until the current cell is 0\n\t:  :: prints the current cell into stderr\n\t.  :: prints the current cell into stdout\n\t,  :: gets 1 character from stdin\n\t@  :: exits with the current cell as the value\n\t>  :: switches to the cell on the left\n\t<  :: switches to the cell on the right\n"); return 0;
+				case 'g': printf("Guide:\t[] :: loops until the current cell is 0\n\t:  :: prints the current cell into stderr\n\t.  :: prints the current cell into stdout\n\t,  :: gets 1 character from stdin\n\t@  :: exits with the current cell as the value\n\t>  :: switches to the cell on the left\n\t<  :: switches to the cell on the right\n\t#  :: puts random into the current cell (really old CPUs are not supported)\n\t\\  :: clears the screen\n"); return 0;
 				default: printf("Invalid argument: %s\n", av[i]); return 1;
 			}
 		}
@@ -45,7 +45,7 @@ int main(int ac, char **av) {
 	if (outf == NULL) outf = "a.out";
 	FILE *out = fopen("a.asm", "w");
 
-	fprintf(out, "default rel\n\nsection .bss\ncells resb 30000\nsection .text\nglobal _start\n_start:\nmov r12, 0\n");
+	fprintf(out, "default rel\n\nsection .data\ncls db 27, \"[2J\", 27, \"[H\"\nlen equ $ - cls\nsection .bss\ncells resb 30000\nsection .text\nglobal _start\n_clear:\nmov rax, 1\nmov rdi, 1\nmov rsi, cls\nmov rdx, len\nsyscall\nret\n_start:\nmov r12, 0\n");
 
 	int loop = 0;
 	int loops[1024];
@@ -60,6 +60,9 @@ int main(int ac, char **av) {
 			case '<': fprintf(out, "dec r12\n"); break;
 			
 			case '@': fprintf(out, "mov rax, 60\nmov rdi, [cells+r12]\nsyscall\n"); break;
+			case '\\': fprintf(out, "call _clear\n"); break;
+
+			case '#': fprintf(out, "rdrand ax\nmov [cells+r12], al\n"); break;
 
 			case '.': fprintf(out, "mov rax, 1\nmov rdi, 1\nlea rsi, [cells+r12]\nmov rdx, 1\nsyscall\n"); break;
 			case ',': fprintf(out, "mov rax, 0\nmov rdi, 0\nlea rsi, [cells+r12]\nmov rdx, 1\nsyscall\n"); break;
