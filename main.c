@@ -6,12 +6,27 @@
 int main(int ac, char **av) {
 	char *outf;
 	char *inf;
+	if (ac < 2 || ac > 3) {
+		printf("too many or few arguments.\n");
+		return 1;
+	}
 	for (int i = 0; i < ac; i++) {
 		if (strstr(av[i], "if=") != NULL) {
 			inf = av[i] + 3;
 		} else if (strstr(av[i], "of=") != NULL) {
 			outf = av[i] + 3 ;
+		} else if (av[i][0] == '-') {
+			switch (av[i][1]) {
+				case 'h': printf("Usage:\n\t%s if=[FILE] of=[FILE]\n\t\t-h # prints this menu\n\t\t-v # prints version\n\t\t-g # prints guide\n", av[0]); return 0;
+				case 'v': printf("Version v1.0\n"); return 0;
+				case 'g': printf("Guide:\t[] :: loops until the current cell is 0\n\t:  :: prints the current cell into stderr\n\t.  :: prints the current cell into stdout\n\t,  :: gets 1 character from stdin\n\t@  :: exits with the current cell as the value\n\t>  :: switches to the cell on the left\n\t<  :: switches to the cell on the right\n"); return 0;
+				default: printf("Invalid argument: %s\n", av[i]); return 1;
+			}
 		}
+	}
+	if (inf == NULL) {
+		printf("No input file given. Please give an input file with if=[FILE]\n");
+		return 1;
 	}
 
 	FILE *src = fopen(inf, "r");

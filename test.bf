@@ -9,7 +9,7 @@ if it wrongly runs once cell 1 becomes 66 and this prints B instead of A
 
 Test 3 nested loops
 4 times 4 times 4 is 64 plus 2 is 66 which prints B
->++++[>++++[>++++<-]<-]>>++.
+>++++[>++++[>++++<-]<-]>>++:
 
 Test 4 newline
 >++++++++++.
