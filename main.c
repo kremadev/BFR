@@ -27,11 +27,15 @@ int main(int ac, char **av) {
 	fread(buffer, 1, size, src);
 	fclose(src);
 	
-	if (outf == NULL) outf == "a.out";
+	if (outf == NULL) outf = "a.out";
 	FILE *out = fopen("a.asm", "w");
 
 	fprintf(out, "default rel\n\nsection .bss\ncells resb 30000\nsection .text\nglobal _start\n_start:\nmov r12, 0\n");
 
+	int loop = 0;
+	int loops[1024];
+	int next = 1;
+	
 	for (int i = 0; i < size; i++) {
 		switch (buffer[i]) {
 			case '+': fprintf(out, "inc [cells+r12]\n"); break;
@@ -40,14 +44,16 @@ int main(int ac, char **av) {
 			case '>': fprintf(out, "inc r12\n"); break;
 			case '<': fprintf(out, "dec r12\n"); break;
 			
+			case '@': fprintf(out, "mov rax, 60\nmov rdi, [cells+r12]\nsyscall\n"); break;
+
 			case '.': fprintf(out, "mov rax, 1\nmov rdi, 1\nlea rsi, [cells+r12]\nmov rdx, 1\nsyscall\n"); break;
-			
-			case 0xA:
-			case ' ': break;
-			default: printf("Error: unknown character: %c\n", buffer[i]); return 1;
+			case ',': fprintf(out, "mov rax, 0\nmov rdi, 0\nlea rsi, [cells+r12]\nmov rdx, 1\nsyscall\n"); break;
+			case ':': fprintf(out, "mov rax, 1\nmov rdi, 2\nlea rsi, [cells+r12]\nmov rdx, 1\nsyscall\n"); break;
+
+			case '[': fprintf(out, "loop%d:\ncmp byte [cells+r12], 0\nje end%d\n", next, next); loops[loop] = next; loop++; next++; break;
+			case ']': loop--; fprintf(out, "cmp byte [cells+r12], 0\njne loop%d\nend%d:\n", loops[loop], loops[loop]); break;
 		}
 	}
-	fprintf(out, "\nmov rax, 60\nmov rdi, 0\nsyscall\n");
 	fclose(out);
 	
 	char sysbuf[1024];
