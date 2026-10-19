@@ -4,22 +4,22 @@
 #include <stdlib.h>
 
 int main(int ac, char **av) {
-	char *outf;
-	char *inf;
+	char *outf = NULL;
+	char *inf = NULL;
 	if (ac < 2 || ac > 3) {
 		printf("too many or few arguments.\n");
 		return 1;
 	}
 	for (int i = 0; i < ac; i++) {
-		if (strstr(av[i], "if=") != NULL) {
+		if (strncmp(av[i], "if=", 3) == 0) {
 			inf = av[i] + 3;
-		} else if (strstr(av[i], "of=") != NULL) {
+		} else if (strncmp(av[i], "of=", 3) == 0) {
 			outf = av[i] + 3 ;
 		} else if (av[i][0] == '-') {
 			switch (av[i][1]) {
 				case 'h': printf("Usage:\n\t%s if=[FILE] of=[FILE]\n\t\t-h # prints this menu\n\t\t-v # prints version\n\t\t-g # prints guide\n", av[0]); return 0;
 				case 'v': printf("Version v1.0\n"); return 0;
-				case 'g': printf("Guide:\t[] :: loops until the current cell is 0\n\t:  :: prints the current cell into stderr\n\t.  :: prints the current cell into stdout\n\t,  :: gets 1 character from stdin\n\t@  :: exits with the current cell as the value\n\t>  :: switches to the cell on the left\n\t<  :: switches to the cell on the right\n\t#  :: puts random into the current cell (really old CPUs are not supported)\n\t\\  :: clears the screen\n"); return 0;
+				case 'g': printf("Guide:\t[] :: loops until the current cell is 0\n\t:  :: prints the current cell into stderr\n\t.  :: prints the current cell into stdout\n\t,  :: gets 1 character from stdin\n\t@  :: exits with the current cell as the value\n\t<  :: switches to the cell on the left\n\t>  :: switches to the cell on the right\n\t#  :: puts random into the current cell (really old CPUs are not supported)\n\t\\  :: clears the screen\n\t!  :: returns to cell one\n"); return 0;
 				default: printf("Invalid argument: %s\n", av[i]); return 1;
 			}
 		}
@@ -45,37 +45,46 @@ int main(int ac, char **av) {
 	if (outf == NULL) outf = "a.out";
 	FILE *out = fopen("a.asm", "w");
 
-	fprintf(out, "default rel\n\nsection .data\ncls db 27, \"[2J\", 27, \"[H\"\nlen equ $ - cls\nsection .bss\ncells resb 30000\nsection .text\nglobal _start\n_clear:\nmov rax, 1\nmov rdi, 1\nmov rsi, cls\nmov rdx, len\nsyscall\nret\n_start:\nmov r12, 0\n");
+	fprintf(out, "\n.data\ncls: .ascii \"\\033[2J\\033[H\"\nlen = . - cls\n.bss\ncells: .skip 30000\n.text\n.globl _start\n");
+	fprintf(out, "clear:\nmov $1, %%rax\nmov $1, %%rdi\nlea cls(%%rip), %%rsi\nmov $len, %%rdx\nsyscall\nret\n\n_start:\nxor %%rdi, %%rdi\n");
 
+	int exit = 0;
 	int loop = 0;
 	int loops[1024];
 	int next = 1;
 	
 	for (int i = 0; i < size; i++) {
 		switch (buffer[i]) {
-			case '+': fprintf(out, "inc [cells+r12]\n"); break;
-			case '-': fprintf(out, "dec [cells+r12]\n"); break;
+			case '+': fprintf(out, "incb cells(%%r12)\n"); break;
+			case '-': fprintf(out, "decb cells(%%r12)\n"); break;
 			
-			case '>': fprintf(out, "inc r12\n"); break;
-			case '<': fprintf(out, "dec r12\n"); break;
+			case '>': fprintf(out, "inc %%r12\n"); break;
+			case '<': fprintf(out, "dec %%r12\n"); break;
 			
-			case '@': fprintf(out, "mov rax, 60\nmov rdi, [cells+r12]\nsyscall\n"); break;
-			case '\\': fprintf(out, "call _clear\n"); break;
+			case '@': fprintf(out, "mov $60, %%rax\nmovzbl cells(%%r12), %%edi\nsyscall\n"); exit = 1; break;
+			case '\\': fprintf(out, "call clear\n"); break;
 
-			case '#': fprintf(out, "rdrand ax\nmov [cells+r12], al\n"); break;
+			case '#': fprintf(out, "rdrand %%ax\nmov %%al, cells(%%r12)\n"); break;
+			case '!': fprintf(out, "mov $0, %%r12\n"); break;
 
-			case '.': fprintf(out, "mov rax, 1\nmov rdi, 1\nlea rsi, [cells+r12]\nmov rdx, 1\nsyscall\n"); break;
-			case ',': fprintf(out, "mov rax, 0\nmov rdi, 0\nlea rsi, [cells+r12]\nmov rdx, 1\nsyscall\n"); break;
-			case ':': fprintf(out, "mov rax, 1\nmov rdi, 2\nlea rsi, [cells+r12]\nmov rdx, 1\nsyscall\n"); break;
+			case '.': fprintf(out, "mov $1, %%rax\nmov $1, %%rdi\nlea cells(%%r12), %%rsi\nmov $1, %%rdx\nsyscall\n"); break;
+			case ',': fprintf(out, "mov $0, %%rax\nmov $0, %%rdi\nlea cells(%%r12), %%rsi\nmov $1, %%rdx\nsyscall\n"); break;
+			case ':': fprintf(out, "mov $1, %%rax\nmov $2, %%rdi\nlea cells(%%r12), %%rsi\nmov $1, %%rdx\nsyscall\n"); break;
 
-			case '[': fprintf(out, "loop%d:\ncmp byte [cells+r12], 0\nje end%d\n", next, next); loops[loop] = next; loop++; next++; break;
-			case ']': loop--; fprintf(out, "cmp byte [cells+r12], 0\njne loop%d\nend%d:\n", loops[loop], loops[loop]); break;
+			case '[': fprintf(out, "loop%d:\ncmpb $0, cells(%%r12)\nje end%d\n", next, next); loops[loop] = next; loop++; next++; break;
+			case ']': loop--; fprintf(out, "cmpb $0, cells(%%r12)\njne loop%d\nend%d:\n", loops[loop], loops[loop]); break;
 		}
 	}
+
+	if (exit == 0) {
+		fprintf(out, "\n\nmov $60, %%rax\nmov $0, %%rdi\nsyscall\n");
+	}
+
+	fprintf(out, "\n\n.section .note.GNU-stack, \"\", @progbits\n");
 	fclose(out);
 	
 	char sysbuf[1024];
-	snprintf(sysbuf, 1024, "nasm -felf64 a.asm -o a.o && ld a.o -o %s && rm a.o ; rm a.asm\0", outf);
+	snprintf(sysbuf, 1024, "as a.asm -o a.o ; ld a.o -o %s ; rm a.o #; rm a.asm", outf);
 	system(sysbuf);
 
 	free(buffer);

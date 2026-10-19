@@ -1,0 +1,1 @@
+BFR was supposed to be BrainFuck Runner which was supposed to run code like python. But than i thought about using assembly so i made it a compiler but i didnt change the name and i never will. (Probably) 
